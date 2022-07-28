@@ -231,7 +231,8 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 		$json = json_decode($response, true);
 		if (!$json) {
 			$error = new ErrorList();
-			$this->log(t('Unable to decode transaction response from POLi: response %s', $response), true);
+			$this->log(t('Unable to decode transaction response from POLi: response %s', var_export($response, true)), true);
+			$error->add(t('Unable to decode transaction response from POLi'));
 			$this->flash('error', $error);
 
 			header('Location: ' . url::to('/checkout'));
@@ -373,6 +374,13 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 			}
 		} else {
 			$this->log(t('%s: Order %s not complete because transaction status is %s, token %s', $method, $oid, $json['TransactionStatus'], $token));
+
+			$date = $order->getOrderDate();
+			if ($date instanceof \DateTime) {
+				$date = $date->format('r');
+			}
+
+			$this->log(t("Order date %s, return from POLi:\n %s", $date, var_export($json, true)));
 		}
 	}
 
