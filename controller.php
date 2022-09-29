@@ -30,8 +30,7 @@ class Controller extends Package {
 			throw new ErrorException(t('This package requires that Community Store be installed'));
 		} else {
 			$pkg = parent::install();
-			$pm = new PaymentMethod();
-			$pm->add('community_store_poli', 'POLi', $pkg);
+			PaymentMethod::add('community_store_poli', 'POLi', $pkg);
 		}
 
 	}
