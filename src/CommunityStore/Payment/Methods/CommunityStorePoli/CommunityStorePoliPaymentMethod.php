@@ -11,11 +11,12 @@ use Concrete\Core\Error\ErrorList\ErrorList;
 use Concrete\Core\Http\Response;
 use Concrete\Core\Support\Facade\Application;
 use Core;
+use GuzzleHttp\Exception\GuzzleException;
 use IPLib\Address\AddressInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use URL;
 use Config;
-
+use GuzzleHttp\Client;
 use \Concrete\Package\CommunityStore\Src\CommunityStore\Payment\Method as StorePaymentMethod;
 use \Concrete\Package\CommunityStore\Src\CommunityStore\Order\Order as StoreOrder;
 use Concrete\Core\Logging\LoggerFactory;
@@ -33,16 +34,16 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 	}
 
 	public function dashboardForm () {
-		$this->set('livetapiurl', Config::get('community_store.poli.liveapiurl'));
-		$this->set('livemerchantcode', Config::get('community_store.poli.livemerchantcode'));
-		$this->set('liveauthcode', Config::get('community_store.poli.liveauthcode'));
-		$this->set('testmode', Config::get('community_store.poli.testmode'));
-		$this->set('testapiurl', Config::get('community_store.poli.testapiurl'));
-		$this->set('testmerchantcode', Config::get('community_store.poli.testmerchantcode'));
-		$this->set('testauthcode', Config::get('community_store.poli.testauthcode'));
-		$this->set('currency', Config::get('community_store.poli.currency'));
-		$this->set('maxattempts', Config::get('community_store.poli.maxattempts'));
-		$this->set('debug', Config::get('community_store.poli.debug'));
+		$this->set('livetapiurl', Config::get('community_store_poli.liveapiurl'));
+		$this->set('livemerchantcode', Config::get('community_store_poli.livemerchantcode'));
+		$this->set('liveauthcode', Config::get('community_store_poli.liveauthcode'));
+		$this->set('testmode', Config::get('community_store_poli.testmode'));
+		$this->set('testapiurl', Config::get('community_store_poli.testapiurl'));
+		$this->set('testmerchantcode', Config::get('community_store_poli.testmerchantcode'));
+		$this->set('testauthcode', Config::get('community_store_poli.testauthcode'));
+		$this->set('currency', Config::get('community_store_poli.currency'));
+		$this->set('maxattempts', Config::get('community_store_poli.maxattempts'));
+		$this->set('debug', Config::get('community_store_poli.debug'));
 		$currencies = array(
 //			'AUD' => 'Australian Dollar',
 			'NZD' => 'New Zealand Dollar',
@@ -53,36 +54,17 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 	}
 
 
-	private function getAuth () {
-		if (Config::get('community_store.poli.testmode')) {
-			return base64_encode(Config::get('community_store.poli.testmerchantcode') . ':' . Config::get('community_store.poli.testauthcode'));
-		}
-
-		return base64_encode(Config::get('community_store.poli.livemerchantcode') . ':' . Config::get('community_store.poli.liveauthcode'));
-	}
-
-	private function getURL () {
-		if (Config::get('community_store.poli.testmode')) {
-			$url = Config::get('community_store.poli.testapiurl');
-		} else {
-			$url = Config::get('community_store.poli.liveapiurl');
-		}
-
-		// Remove trailing / if it's there, so we do not end up with two later
-		return trim($url, '/');
-	}
-
 	public function save (array $data = []) {
-		Config::save('community_store.poli.testapiurl', $data['politestapiurl']);
-		Config::save('community_store.poli.currency', $data['policurrency']);
-		Config::save('community_store.poli.testmerchantcode', $data['politestmerchantcode']);
-		Config::save('community_store.poli.testauthcode', $data['politestauthcode']);
-		Config::save('community_store.poli.debug', ($data['polidebug'] ? 1 : 0));
-		Config::save('community_store.poli.liveapiurl', $data['poliliveapiurl']);
-		Config::save('community_store.poli.livemerchantcode', $data['polilivemerchantcode']);
-		Config::save('community_store.poli.liveauthcode', $data['poliliveauthcode']);
-		Config::save('community_store.poli.testmode', ($data['politestmode'] ? 1 : 0));
-		Config::save('community_store.poli.maxattempts', ($data['polimaxattempts'] ? (int) $data['polimaxattempts'] : 20));
+		Config::save('community_store_poli.testapiurl', $data['politestapiurl']);
+		Config::save('community_store_poli.currency', $data['policurrency']);
+		Config::save('community_store_poli.testmerchantcode', $data['politestmerchantcode']);
+		Config::save('community_store_poli.testauthcode', $data['politestauthcode']);
+		Config::save('community_store_poli.debug', ($data['polidebug'] ? 1 : 0));
+		Config::save('community_store_poli.liveapiurl', $data['poliliveapiurl']);
+		Config::save('community_store_poli.livemerchantcode', $data['polilivemerchantcode']);
+		Config::save('community_store_poli.liveauthcode', $data['poliliveauthcode']);
+		Config::save('community_store_poli.testmode', ($data['politestmode'] ? 1 : 0));
+		Config::save('community_store_poli.maxattempts', ($data['polimaxattempts'] ? (int) $data['polimaxattempts'] : 20));
 	}
 
 
@@ -117,27 +99,6 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 	}
 
 
-	private function log ($message, $force = false) {
-		if (!$force) {
-			if (!Config::get('community_store.poli.debug')) {
-				return false;
-			}
-		}
-		if (!$this->logger) {
-			$app = Application::getFacadeApplication();
-			$this->logger = $app->make(LoggerFactory::class)->createLogger('poli');
-		}
-		if ($force) {
-			$this->logger->addError($message);
-		} else {
-			$this->logger->addDebug($message);
-		}
-
-		return true;
-
-	}
-
-
 	public function getAction () {
 		// This function is called by the checkout::external() method, which does not listen for a response object
 		$app = Application::getFacadeApplication();
@@ -159,7 +120,7 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 		/** @var $ip  AddressInterface */
 		$ip = $app->make(AddressInterface::class);
 
-		$maxAttempts = Config::get('community_store.poli.maxattempts') ?: 20;
+		$maxAttempts = Config::get('community_store_poli.maxattempts') ?: 20;
 
 		if (++$POLiAttempts > $maxAttempts) {
 			$this->log(t('More than %s checkout attempts from IP %s', $maxAttempts, $ip), true);
@@ -180,7 +141,7 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 		// https://www.polipayments.com/InitiateTransaction
 		$payload = [
 			'Amount' => number_format($order->getTotal(), 2, '.', ''),
-			'CurrencyCode' => Config::get('community_store.poli.currency'),
+			'CurrencyCode' => Config::get('community_store_poli.currency'),
 			'MerchantReference' => t('Order %s', sprintf('%06d', $oid)),
 			'MerchantReferenceFormat' => '1', // free format
 			'MerchantData' => $oid,
@@ -191,105 +152,82 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 			'NotificationURL' => (string) URL::to('/checkout/polinudge'),
 		];
 
-		$json = json_encode($payload);
-		$this->log(var_export($json, true));
-
-		$auth = $this->getAuth();
-
-		$headers = ['Content-Type: application/json', 'Authorization: Basic ' . $auth];
+		$this->log(var_export($payload, true));
 
 		$url = $this->getURL() . '/api/v2/Transaction/Initiate';
 		$this->log(var_export($url, true));
 
-		$ch = curl_init($url);
-		curl_setopt($ch, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		curl_setopt($ch, CURLOPT_HEADER, 0);
-		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
-		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 0);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		$response = curl_exec($ch);
-		$err = curl_errno($ch);
-		$errormess = curl_error($ch);
-		$status = curl_getinfo($ch);
+		$client = new Client();
+		try {
+			$response = $client->request('POST', $url, [
+					'auth' => [$this->getMerchantCode(), $this->getAuthCode()],
+					'json' => $payload]
+			);
 
-		curl_close($ch);
+			$json = json_decode($response->getBody()->getContents(), true);
 
-		if ($err || $status['http_code'] !== 200) {
+			if (!$json) {
+				$error = new ErrorList();
+				$this->log(t('Unable to decode transaction response from POLi: response %s', var_export($json, true)), true);
+				$error->add(t('Unable to decode transaction response from POLi'));
+				$this->flash('error', $error);
+
+				header('Location: ' . url::to('/checkout'));
+				die();
+			}
+
+			if ($json['Success'] !== true) {
+				$error = new ErrorList();
+				$error->add(t('Error initiating transaction with POLi'));
+				$this->flash('error', $error);
+				$this->log(t('Error initiating transaction with POLi: response %s', $json), true);
+
+				header('Location: ' . url::to('/checkout'));
+				die();
+			}
+
+			return $json['NavigateURL'];
+
+		} catch (GuzzleException $e) {
 			$error = new ErrorList();
 			$error->add(t('Unable to initiate transactions with POLi'));
 			$this->flash('error', $error);
-			$this->log(t('Unable to intiate transaction with POLi: error %s %s, status %s, response %s', $err, $errormess, $status, $response), true);
+			$this->log(t('Unable to intiate transaction with POLi: error %s, response %s', $e->getMessage(), $response), true);
 
 			// Not returning a response object because nothing is handling it.
 			header('Location: ' . url::to('/checkout'));
 			die();
-
 		}
-
-		$json = json_decode($response, true);
-		if (!$json) {
-			$error = new ErrorList();
-			$this->log(t('Unable to decode transaction response from POLi: response %s', var_export($response, true)), true);
-			$error->add(t('Unable to decode transaction response from POLi'));
-			$this->flash('error', $error);
-
-			header('Location: ' . url::to('/checkout'));
-			die();
-		}
-
-		if ($json['Success'] !== true) {
-			$error = new ErrorList();
-			$error->add(t('Error initiating transaction with POLi'));
-			$this->flash('error', $error);
-			$this->log(t('Error initiating transaction with POLi: response %s', $response), true);
-
-			header('Location: ' . url::to('/checkout'));
-			die();
-		}
-
-		return $json['NavigateURL'];
 	}
 
 	private function getTransaction ($token) {
-		$headers = ['Authorization: Basic ' . $this->getAuth()];
 		$url = $this->getURL() . '/api/v2/Transaction/GetTransaction?token=' . urlencode($token);
 		$this->log(t('Performing getTransaction for token %s', $token));
 
-		$ch = curl_init($url);
-		curl_setopt($ch, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		curl_setopt($ch, CURLOPT_HEADER, 0);
-		curl_setopt($ch, CURLOPT_POST, 0);
-		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 0);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		$response = curl_exec($ch);
-
-		$err = curl_errno($ch);
-		$errormess = curl_error($ch);
-		$status = curl_getinfo($ch);
-
-		curl_close($ch);
-
-		if ($err || $status['http_code'] !== 200) {
-			$this->log(t('Error performing GetTransaction for token %s, url=%s, err=%s, error=%s, status=%s, response=%s',
-				$token, $url, $err, $errormess, $status, var_export($response, true)), true);
+		$client = new Client();
+		try {
+			$response = $client->request('GET', $url, [
+				'auth' => [$this->getMerchantCode(), $this->getAuthCode()],
+			]);
+		} catch (GuzzleException $e) {
+			$this->log(t('Error performing GetTransaction for token %s, url=%s, err=%s',
+				$token, $url, $e->getMessage()), true);
 
 			return new Response('Fail', 500);
 		}
 
-		$json = json_decode($response, true);
+		$content = $response->getBody()->getContents();
+		$json = json_decode($content, true);
 		if (!$json) {
-			$this->log(t('Cannot parse JSON from GetTransaction for token %s, url=%s, err=%s, error=%s, status=%s, response=%s',
-				$token, $url, $err, $errormess, $status, var_export($response, true)), true);
+			$this->log(t('Cannot parse JSON from GetTransaction for token %s, url=%s,  response=%s',
+				$token, $url, var_export($content, true)), true);
 
 			return new Response('Fail', 500);
 		}
 
 		if ($json['ErrorCode']) {
 			$this->log(t('Transactions error %s %s from GetTransaction for token %s, response=%s',
-				$json['ErrorCode'], $json['ErrorMessage'], $token, var_export($response, true)), true);
+				$json['ErrorCode'], $json['ErrorMessage'], $token, var_export($content, true)), true);
 		}
 
 		return $json;
@@ -458,5 +396,53 @@ class CommunityStorePoliPaymentMethod extends StorePaymentMethod {
 
 		// Return to the regular checkout complete page.
 		return new RedirectResponse(\URL::to('/checkout/complete'));
+	}
+
+	private function getMerchantCode () {
+		if (Config::get('community_store_poli.testmode')) {
+			return Config::get('community_store_poli.testmerchantcode');
+		}
+
+		return Config::get('community_store_poli.livemerchantcode');
+	}
+
+	private function getAuthCode () {
+		if (Config::get('community_store_poli.testmode')) {
+			return Config::get('community_store_poli.testauthcode');
+		}
+
+		return Config::get('community_store_poli.liveauthcode');
+	}
+
+
+	private function getURL () {
+		if (Config::get('community_store_poli.testmode')) {
+			$url = Config::get('community_store_poli.testapiurl');
+		} else {
+			$url = Config::get('community_store_poli.liveapiurl');
+		}
+
+		// Remove trailing / if it's there, so we do not end up with two later
+		return trim($url, '/');
+	}
+
+	private function log ($message, $force = false) {
+		if (!$force) {
+			if (!Config::get('community_store_poli.debug')) {
+				return false;
+			}
+		}
+		if (!$this->logger) {
+			$app = Application::getFacadeApplication();
+			$this->logger = $app->make(LoggerFactory::class)->createLogger('poli');
+		}
+		if ($force) {
+			$this->logger->addError($message);
+		} else {
+			$this->logger->addDebug($message);
+		}
+
+		return true;
+
 	}
 }

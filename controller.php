@@ -2,15 +2,16 @@
 
 namespace Concrete\Package\CommunityStorePoli;
 
+use Concrete\Package\CommunityStorePoli\Src\CommunityStore\Payment\Methods\CommunityStorePoli\CommunityStorePoliPaymentMethod;
 use Package;
 use Route;
 use Whoops\Exception\ErrorException;
-use \Concrete\Package\CommunityStore\Src\CommunityStore\Payment\Method as PaymentMethod;
+use Concrete\Package\CommunityStore\Src\CommunityStore\Payment\Method as PaymentMethod;
 
 class Controller extends Package {
 	protected $pkgHandle = 'community_store_poli';
 	protected $appVersionRequired = '8.5.0';
-	protected $pkgVersion = '0.1';
+	protected $pkgVersion = '0.2';
 
 	protected $pkgAutoloaderRegistries = [
 		'src/CommunityStore' => '\Concrete\Package\CommunityStorePoli\Src\CommunityStore'
@@ -44,8 +45,8 @@ class Controller extends Package {
 	}
 
 	public function on_start () {
-		Route::register('/checkout/polifail', '\Concrete\Package\CommunityStorePoli\Src\CommunityStore\Payment\Methods\CommunityStorePoli\CommunityStorePoliPaymentMethod::PoliFail');
-		Route::register('/checkout/polinudge', '\Concrete\Package\CommunityStorePoli\Src\CommunityStore\Payment\Methods\CommunityStorePoli\CommunityStorePoliPaymentMethod::PoliNudge');
-		Route::register('/checkout/polisuccess', '\Concrete\Package\CommunityStorePoli\Src\CommunityStore\Payment\Methods\CommunityStorePoli\CommunityStorePoliPaymentMethod::PoliSuccess');
+		Route::register('/checkout/polifail', CommunityStorePoliPaymentMethod::class . '::PoliFail');
+		Route::register('/checkout/polinudge', CommunityStorePoliPaymentMethod::class . '::PoliNudge');
+		Route::register('/checkout/polisuccess', CommunityStorePoliPaymentMethod::class . '::PoliSuccess');
 	}
 }
